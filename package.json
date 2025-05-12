@@ -1,0 +1,29 @@
+{
+	"name": "inv",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"directories": {
+		"test": "test"
+	},
+	"type": "module",
+	"scripts": {
+		"test": "mocha src/test  --timeout 10000",
+		"test:report": "mocha src/test --timeout 10000 --reporter mochawesome"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"axios": "^1.9.0",
+		"chai": "^5.2.0",
+		"dotenv": "^16.5.0",
+		"mocha": "^11.2.2",
+		"node-fetch": "^3.3.2",
+		"sinon": "^20.0.0"
+	},
+	"devDependencies": {
+		"chai-http": "^5.1.2",
+		"mochawesome": "^7.1.3"
+	}
+}

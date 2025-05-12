@@ -1,0 +1,48 @@
+/Inv_API_Tests.zip
+/node_modules
+
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# dotenv environment files
+# .env
+# .env.*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Test & coverage reports
+coverage/
+mochawesome-report/
+*.lcov
+
+# IDE/editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Build artifacts (if any)
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# Local test files or runtime data
+*.local
+*.test.js.snap
+*.tmp
+
+# Mocha report directories
+reports/
+mochawesome-report/Assets/
+coverage/
