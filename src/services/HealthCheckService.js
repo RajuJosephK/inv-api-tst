@@ -13,7 +13,7 @@ export class HealthCheckService {
 	// Check the health of the API and DB
 	async healthCheck() {
 		try {
-			this.logger.info("Initializing healthCheck...");
+			this.logger.info("Initialising healthCheck...");
 
 			const response = await this.client.handleRequest(() =>
 				this.client.client.get("/status")
