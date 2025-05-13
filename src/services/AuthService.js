@@ -1,5 +1,4 @@
 import { LoginService } from "./LoginService.js";
-import { TestUsers } from "../data/TestUsers.js";
 import { WinstonLogger } from "../utils/WinstonLogger.js";
 
 // Initialise the logger
@@ -13,14 +12,11 @@ export class AuthService {
 	}
 
 	// Initialise the authentication process
-	async initAuth() {
+	async initAuth(username, password) {
 		try {
 			this.logger.info("Initialising authentication process...");
 
-			const response = await this.loginService.login(
-				TestUsers.validUser1.username,
-				TestUsers.validUser1.password
-			);
+			const response = await this.loginService.login(username, password);
 
 			if (response.status === 200 && response.data.token) {
 				this.authClient.setToken(response.data.token);

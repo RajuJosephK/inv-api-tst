@@ -1,6 +1,7 @@
 import { HealthCheckService } from "../services/HealthCheckService.js";
 import { AuthClient } from "../utils/AuthClient.js";
 import { AuthService } from "../services/AuthService.js";
+import { TestUsers } from "../data/TestUsers.js";
 import * as chai from "chai";
 import chaiHttp from "chai-http";
 import { WinstonLogger } from "../utils/WinstonLogger.js"; // Import logger
@@ -21,7 +22,10 @@ describe("should return OK status for API and database connection", () => {
 		logger.info("Starting authentication process before tests...");
 
 		try {
-			await authService.initAuth(); // Get token before tests
+			await authService.initAuth(
+				TestUsers.validUser1.username,
+				TestUsers.validUser1.password
+			); // Get token before tests
 		} catch (error) {
 			logger.error("Authentication process failed: " + error.message);
 			throw error;

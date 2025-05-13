@@ -3,6 +3,7 @@ import { AuthClient } from "../utils/AuthClient.js";
 import { AuthService } from "../services/AuthService.js";
 import { ProductService } from "../services/ProductService.js";
 import { WinstonLogger } from "../utils/WinstonLogger.js";
+import { TestUsers } from "../data/TestUsers.js";
 import * as chai from "chai";
 import chaiHttp from "chai-http";
 
@@ -20,8 +21,10 @@ let productId_Seed = "";
 describe("Order and Stock Management", () => {
 	before(async () => {
 		logger.info("Initializing authentication and setting token...");
-
-		await authService.initAuth();
+		await authService.initAuth(
+			TestUsers.validUser1.username,
+			TestUsers.validUser1.password
+		);
 	});
 
 	describe("Seed Product Data", () => {

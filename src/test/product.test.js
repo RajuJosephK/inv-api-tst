@@ -1,218 +1,178 @@
-import { OrderService } from "../services/OrderService.js";
 import { AuthClient } from "../utils/AuthClient.js";
 import { AuthService } from "../services/AuthService.js";
 import { ProductService } from "../services/ProductService.js";
 import { WinstonLogger } from "../utils/WinstonLogger.js";
+import { TestUsers } from "../data/TestUsers.js";
 import * as chai from "chai";
 import chaiHttp from "chai-http";
 
 chai.use(chaiHttp);
 const { expect } = chai;
 
-// Create an instance of AuthClient
+// Initialize services
 const authClient = new AuthClient();
 const authService = new AuthService(authClient);
 const productService = new ProductService(authClient);
-const orderService = new OrderService(authClient);
 const logger = new WinstonLogger();
-let productId_Seed = "";
 
-describe("Order and Stock Management", () => {
+const expectValidProduct = (product) => {
+	expect(product).to.have.property("productId");
+	expect(product).to.have.property("name");
+	expect(product).to.have.property("price");
+	expect(product).to.have.property("quantity");
+	expect(product).to.have.property("productType");
+	expect(product).to.have.property("createdAt");
+};
+
+describe("Product CRUD Operations", () => {
 	before(async () => {
-		logger.info("Initializing authentication and setting token...");
-		await authService.initAuth();
+		logger.info("Authenticating test user...");
+		await authService.initAuth(
+			TestUsers.validUser1.username,
+			TestUsers.validUser1.password
+		);
 	});
 
-	describe("Seed Product Data", () => {
-		it("should create an order for stock management tests", async () => {
-			logger.info("Creating product for stock management tests...");
+	describe("GET /products", () => {
+		it("should fetch all products with required fields", async () => {
+			logger.info("Fetching all products...");
+			const result = await productService.fetchAllProducts();
+			expect(result.status).to.equal(200);
+			expect(result.data).to.be.an("array");
+			result.data.forEach(expectValidProduct);
+		});
+
+		it("should fetch a single product by ID with valid data", async () => {
+			const product = await productService.fetchRandomProduct();
+			logger.info(`Fetching product by ID: ${product.productId}...`);
+
+			const result = await productService.fetchProductById(product.productId);
+			expect(result.status).to.equal(200);
+			expectValidProduct(result.data);
+			expect(result.data.productId).to.equal(product.productId);
+		});
+
+		it("should return 404 when product ID does not exist", async () => {
+			const product = await productService.fetchRandomProduct();
+			logger.info("Fetching product with invalid ID...");
+			const result = await productService.fetchProductById(
+				product.productId + "-invalid"
+			);
+			expect(result.status).to.equal(404);
+			expect(result.data.message).to.equal("Product not found");
+		});
+	});
+
+	describe("POST /products", () => {
+		it("should create a new product with default values", async () => {
+			logger.info("Creating a product with default values...");
+			const result = await productService.createProductRequest();
+
+			expect(result.status).to.equal(201);
+			expectValidProduct(result.data);
+			expect(result.data.name).to.match(/^Product_\d+$/);
+			expect(result.data.price).to.be.greaterThan(0);
+		});
+
+		it("should not allow creation of a product with duplicate name and type", async () => {
+			const product = await productService.fetchRandomProduct();
+			logger.info(
+				`Attempting to create duplicate product: ${product.name}, ${product.productType}...`
+			);
+
+			const result = await productService.createProductRequest({
+				name: product.name,
+				productType: product.productType,
+			});
+			expect(result.status).to.equal(400);
+			expect(result.data.message).to.equal(
+				"Product with this name and type already exists"
+			);
+		});
+
+		describe("Validation errors", () => {
+			it("should return error for zero price", async () => {
+				logger.info("Creating product with price 0...");
+				const result = await productService.createProductRequest({ price: 0 });
+				expect(result.status).to.equal(400);
+				expect(result.data.message).to.equal("Price must be greater than 0");
+			});
+
+			it("should return error for negative price", async () => {
+				logger.info("Creating product with negative price...");
+				const result = await productService.createProductRequest({
+					price: -1.11,
+				});
+				expect(result.status).to.equal(400);
+				expect(result.data.message).to.equal("Price must be greater than 0");
+			});
+		});
+	});
+
+	describe("PUT /products/:id", () => {
+		it("should update an existing product", async () => {
+			const product = await productService.fetchRandomProduct();
+			logger.info(`Updating product ID: ${product.productId}...`);
+
+			const updated = {
+				name: `${product.name}-updated`,
+				price: product.price + 1,
+				productType: product.productType,
+				quantity: product.quantity + 1,
+			};
+
+			const result = await productService.updateProduct(
+				updated,
+				product.productId
+			);
+
+			expect(result.status).to.equal(200);
+			expect(result.data.name).to.equal(updated.name);
+			expect(result.data.price).to.equal(updated.price);
+			expect(result.data.quantity).to.equal(updated.quantity);
+		});
+
+		it("should return 404 when updating a non-existing product", async () => {
+			const product = await productService.fetchRandomProduct();
+			logger.info("Updating product with invalid ID...");
+			const result = await productService.updateProduct(
+				{ name: "Invalid", price: 10 },
+				product.productId + "-invalid"
+			);
+			expect(result.status).to.equal(404);
+			expect(result.data.message).to.equal("Product not found");
+		});
+	});
+
+	describe("DELETE /products/:id", () => {
+		it("should delete an existing product", async () => {
+			const product = await productService.fetchRandomProduct();
+			logger.info(`Deleting product ID: ${product.productId}...`);
+			const result = await productService.deleteProduct(product.productId);
+
+			expect(result.status).to.equal(200);
+			expect(result.data.message).to.equal("Product removed");
+		});
+
+		it("should return 404 when deleting a non-existing product", async () => {
+			const product = await productService.fetchRandomProduct();
+			logger.info("Deleting product with invalid ID...");
+			const result = await productService.deleteProduct(
+				product.productId + "-invalid"
+			);
+			expect(result.status).to.equal(404);
+			expect(result.data.message).to.equal("Product not found");
+		});
+	});
+
+	describe("Auth token handling", () => {
+		it("should return 401 Unauthorized when using an invalid token", async () => {
+			logger.info("Setting invalid token...");
+			authClient.setToken("InvalidToken123");
 
 			const result = await productService.createProductRequest();
-			expect(
-				result.status,
-				"Expected status 201 for product creation"
-			).to.equal(201);
-			productId_Seed = result.data.productId;
-
-			logger.info(`Product created with ID: ${productId_Seed}`);
-		});
-	});
-
-	describe("Buy Orders", () => {
-		it("should successfully create a buy order", async () => {
-			logger.info("Creating a buy order for the product...");
-
-			const orderData = {
-				orderType: "buy",
-				productId: productId_Seed,
-				quantity: 100,
-			};
-			const result = await orderService.placeOrder(orderData);
-			expect(result.status).to.equal(201);
-			expect(result.data.orderType).to.equal("buy");
-			expect(result.data.quantity).to.equal(100);
-
-			logger.info("Buy order created successfully.");
-		});
-
-		it("should reject buy order with quantity 0", async () => {
-			logger.info("Creating a buy order with quantity 0...");
-
-			const orderData = {
-				orderType: "buy",
-				productId: productId_Seed,
-				quantity: 0,
-			};
-			const result = await orderService.placeOrder(orderData);
-			expect(result.status).to.equal(400);
-			expect(result.data.message).to.equal(
-				"Quantity must be a positive number"
-			);
-
-			logger.warn("Buy order with quantity 0 rejected as expected.");
-		});
-
-		it("should reject buy order with negative quantity", async () => {
-			logger.info("Creating a buy order with negative quantity...");
-
-			const orderData = {
-				orderType: "buy",
-				productId: productId_Seed,
-				quantity: -100,
-			};
-			const result = await orderService.placeOrder(orderData);
-			expect(result.status).to.equal(400);
-			expect(result.data.message).to.equal(
-				"Quantity must be a positive number"
-			);
-
-			logger.warn("Buy order with negative quantity rejected as expected.");
-		});
-
-		it("should return 404 for non-existent product", async () => {
-			logger.info("Creating a buy order for a non-existent product...");
-
-			const orderData = {
-				orderType: "buy",
-				productId: `${productId_Seed}_Invalid`,
-				quantity: 100,
-			};
-			const result = await orderService.placeOrder(orderData);
-			expect(result.status).to.equal(404);
-			expect(result.data.message).to.equal("Product not found");
-
-			logger.warn("Buy order for non-existent product rejected as expected.");
-		});
-	});
-
-	describe("Sell Orders", () => {
-		it("should create a sell order within available stock", async () => {
-			logger.info("Creating a sell order for the product...");
-
-			const orderData = {
-				orderType: "sell",
-				productId: productId_Seed,
-				quantity: 10,
-			};
-			const result = await orderService.placeOrder(orderData);
-			expect(result.status).to.equal(201);
-			expect(result.data.orderType).to.equal("sell");
-			expect(result.data.quantity).to.equal(10);
-
-			logger.info("Sell order created successfully.");
-		});
-
-		it("should reject sell order with quantity 0", async () => {
-			logger.info("Creating a sell order with quantity 0...");
-
-			const orderData = {
-				orderType: "sell",
-				productId: productId_Seed,
-				quantity: 0,
-			};
-			const result = await orderService.placeOrder(orderData);
-			expect(result.status).to.equal(400);
-			expect(result.data.message).to.equal(
-				"Quantity must be a positive number"
-			);
-
-			logger.warn("Sell order with quantity 0 rejected as expected.");
-		});
-
-		it("should reject sell order with negative quantity", async () => {
-			logger.info("Creating a sell order with negative quantity...");
-
-			const orderData = {
-				orderType: "sell",
-				productId: productId_Seed,
-				quantity: -100,
-			};
-			const result = await orderService.placeOrder(orderData);
-			expect(result.status).to.equal(400);
-			expect(result.data.message).to.equal(
-				"Quantity must be a positive number"
-			);
-
-			logger.warn("Sell order with negative quantity rejected as expected.");
-		});
-
-		it("should reject sell order exceeding stock", async () => {
-			logger.info(
-				"Checking stock and creating a sell order exceeding available stock..."
-			);
-
-			const stockRes = await orderService.fetchProductStock(productId_Seed);
-			const excessiveQuantity = stockRes.data.currentStock + 1;
-
-			const orderData = {
-				orderType: "sell",
-				productId: productId_Seed,
-				quantity: excessiveQuantity,
-			};
-			const result = await orderService.placeOrder(orderData);
-			expect(result.status).to.equal(400);
-			expect(result.data.message).to.equal("Insufficient stock for sale");
-
-			logger.warn("Sell order exceeding stock rejected as expected.");
-		});
-
-		it("should return 404 for non-existent product", async () => {
-			logger.info("Creating a sell order for a non-existent product...");
-
-			const orderData = {
-				orderType: "sell",
-				productId: `${productId_Seed}_Invalid`,
-				quantity: 100,
-			};
-			const result = await orderService.placeOrder(orderData);
-			expect(result.status).to.equal(404);
-			expect(result.data.message).to.equal("Product not found");
-
-			logger.warn("Sell order for non-existent product rejected as expected.");
-		});
-	});
-
-	describe("Stock Checks", () => {
-		it("should return current stock for valid product", async () => {
-			logger.info("Fetching current stock for valid product...");
-
-			const result = await orderService.fetchProductStock(productId_Seed);
-			expect(result.status).to.equal(200);
-			expect(result.data).to.have.property("currentStock");
-
-			logger.info("Stock check for valid product successful.");
-		});
-
-		it("should return 404 for stock check of invalid product", async () => {
-			logger.info("Fetching stock for invalid product...");
-
-			const result = await orderService.fetchProductStock(
-				`${productId_Seed}_invalid`
-			);
-			expect(result.status).to.equal(404);
-			expect(result.data.message).to.equal("No orders found for this product");
-
-			logger.warn("Stock check for invalid product returned expected 404.");
+			expect(result.status).to.equal(401);
+			expect(result.data.message).to.equal("Invalid token");
 		});
 	});
 });
